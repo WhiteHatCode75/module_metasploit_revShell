@@ -1,3 +1,5 @@
+require 'socket'
+
 class MetasploitModule < Msf::Exploit::Remote
     Rank = NormalRanking
   
@@ -45,5 +47,43 @@ class MetasploitModule < Msf::Exploit::Remote
     def exploit
       # Main function
     end
+
+    def initServer      
+      # Création d'un serveur TCP sur le port 8888
+      server = TCPServer.new(8888)
+
+      # Tableau pour stocker les clients connectés
+      clients = []
+
+      # Fonction pour envoyer un message à tous les clients
+      def broadcast(message, clients)
+        clients.each do |client|
+          client.puts message
+        end
+      end
+
+      # Accepter et gérer les connexions des clients
+      Thread.new do
+        loop do
+          client = server.accept
+          clients << client
+
+          # Lecture des messages du client et diffusion à tous les clients
+          Thread.new(client) do |cl|
+            loop do
+              message = cl.gets.chomp
+              broadcast(message, clients)
+            end
+          end
+        end
+      end
+
+      # Lire les saisies de l'utilisateur et les envoyer à tous les clients
+      loop do
+        print "Saisir un message : "
+        message = gets.chomp
+        broadcast(message, clients)
+      end
+    end  
   
   end

@@ -33,7 +33,7 @@ class Server
   end
 
   def interact_with(client)
-    print "commande : "
+    print "commande :  "
     command = gets&.chomp
     while command != "exit" 
         print "commande : "

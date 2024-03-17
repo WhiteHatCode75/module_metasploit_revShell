@@ -7,9 +7,9 @@ class MetasploitModule < Msf::Exploit::Remote
       super(
         update_info(
           info,
-          'Name' => '[Vendor] [Software] [Root Cause] [Vulnerability type]',
+          'Name' => '[Upec] [Software] [Root Cause] [Vulnerability type]',
           'Description' => %q{
-            Say something that the user might need to know
+            reverse_shell manager by lazare and adil
           },
           'License' => MSF_LICENSE,
           'Author' => [ 'Name' ],
@@ -19,7 +19,7 @@ class MetasploitModule < Msf::Exploit::Remote
           'Platform' => 'win',
           'Targets' => [
             [
-              'System or software version',
+              'Windows x64',
               {
                 'Ret' => 0x41414141 # This will be available in `target.ret`
               }
@@ -41,11 +41,11 @@ class MetasploitModule < Msf::Exploit::Remote
     end
   
     def check
-      # For the check command
+
     end
   
     def exploit
-      # Main function
+      
     end
 
     def initServer      

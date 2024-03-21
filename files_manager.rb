@@ -8,6 +8,11 @@ class MetasploitModule < Msf::Post
   include Msf::Auxiliary::Report
   include Msf::Post::File
 
+  SELECT_UP = "A"
+  SELECT_DOWN = "B"
+  SELECT_READ_FILE = "read"
+  SELECT_SAVE_FILE = "save"
+
   def initialize(info = {})
     super(
       update_info(
@@ -72,23 +77,87 @@ class MetasploitModule < Msf::Post
   
       if verbose == true then puts "browsing subdirectories..." end
 
+        i=0
       Dir.glob("#{starting_point}/**/*").each do |file|
+        # TODO: retirer condition test
+        if true or File.file?(file) && File.extname(file) == ".#{extension}"
 
-      if File.file?(file) && File.extname(file) == ".#{extension}"
+            if verbose == true
+              # puts "file with "+extension+" found !"
+              puts "found : "+File.expand_path(file)
+            end
+            i=i+1
+            files << file
 
-          if verbose == true
-            puts "file with "+extension+" found !"
-            puts "file : "+File.basename(file)
-          end
-
-          files << file
+            # On arrête le scan après 50 fichiers pour tester facilement, à delete
+            if i > 100 then
+              return files
+            end
         end
       end
   
       return files
     end
 
+  # Méthode permettant d'afficher la liste des fichiers trouvés
+  def draw_menu(files)
+    index=0
+    loop do
+      system('clear')
+      puts "found #{files.length} files"
+
+      # Pour afficher la flèche indiquant le fichier sélectionné
+      selected=true
+      files[index..index+50].each do |file|
+        if selected
+          puts "--> #{File.expand_path(file)}"
+          selected = false
+        else
+          puts File.expand_path(file)
+        end
+      end
+      print "\e[999B" # Déplacer le curseur en bas de l'écran
+      print "\e[999D" # Déplacer le curseur à gauche (au début de la ligne)
+
+      puts "[Z] exit"
+      choice=get_input()
+      case choice
+      when SELECT_UP
+        index -= 1 if index > 0
+      when SELECT_DOWN
+        index += 1 if index < files.length-1
+      when SELECT_READ_FILE
+        # ...
+      when SELECT_SAVE_FILE
+        # ...
+      when ""
+        return
+      end
+    end
+  end
+
+  # Ecoute le prochain input et le renvoie
+  def get_input()
+    loop do
+      # Lit une seule touche du terminal sans attendre
+      input = STDIN.getch
+
+      if input == "z"
+        return ""
+      end
+
+      # Si flèche directionnelle
+      if input == "\e" and STDIN.getch == "["
+        input = STDIN.getch
+        return input
+      end
+    end
+  end
+
   def run
-    get_files_list()
+    puts "hello"
+    puts "Retrieveing files..."
+    files = get_files_list()
+    draw_menu(files)
   end
 end

